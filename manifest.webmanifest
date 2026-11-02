@@ -1,0 +1,10 @@
+{
+  "name": "Gun Merge 3D",
+  "short_name": "GunMerge",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#1a1f3a",
+  "theme_color": "#1a1f3a",
+  "icons": [{ "src": "assets/gun_r7.png", "sizes": "32x32", "type": "image/png" }]
+}

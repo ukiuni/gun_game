@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#1a1f3a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Gun Merge 3D">
+  <title>Gun Merge 3D</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/gun_r7.png">
+  <link rel="apple-touch-icon" href="assets/gun_r7.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-screen="title">
+  <canvas id="game" aria-label="3D battlefield"></canvas>
+
+  <!-- TITLE -->
+  <section id="title" class="screen" aria-label="title">
+    <div class="title-inner">
+      <img class="logo pixel" src="assets/logo.png" alt="GUN MERGE">
+      <div class="logo-3d">3D</div>
+      <p class="subtitle" data-i18n="subtitle"></p>
+      <div class="title-guns">
+        <img class="pixel" src="assets/gun_r2.png" alt=""><img class="pixel" src="assets/gun_r4.png" alt=""><img class="pixel" src="assets/gun_r7.png" alt=""><img class="pixel" src="assets/gun_r6.png" alt=""><img class="pixel" src="assets/gun_r3.png" alt="">
+      </div>
+      <button id="btn-title-start" class="btn btn-big btn-pulse" data-i18n="tap_to_start"></button>
+      <label class="lang-row"><span data-i18n="language"></span>
+        <select class="lang-select" id="lang-title"></select>
+      </label>
+    </div>
+  </section>
+
+  <!-- HOME -->
+  <section id="home" class="screen" aria-label="home">
+    <header class="topbar">
+      <div class="pill"><img class="pixel icon" src="assets/coin.png" alt=""><span data-i18n="coins"></span> <b id="home-coins">0</b></div>
+      <div class="pill"><span data-i18n="stage"></span> <b id="home-stage">1</b></div>
+    </header>
+    <div class="home-body">
+      <h2><span data-i18n="my_guns"></span> <small id="home-gun-count"></small></h2>
+      <div id="home-guns" class="gun-grid"></div>
+    </div>
+    <footer class="home-actions">
+      <button id="btn-buy" class="btn btn-gold"><img class="pixel icon" src="assets/coin.png" alt=""><span id="buy-label"></span> <small id="buy-price"></small></button>
+      <button id="btn-play" class="btn btn-big" data-i18n="play"></button>
+      <div class="home-sub">
+        <label class="lang-row"><span data-i18n="language"></span>
+          <select class="lang-select" id="lang-home"></select>
+        </label>
+        <button id="btn-sound" class="btn btn-small"></button>
+      </div>
+    </footer>
+  </section>
+
+  <!-- SETUP (placement) -->
+  <section id="setup" class="screen hud" aria-label="setup">
+    <div class="setup-top">
+    <header class="topbar">
+      <button id="btn-setup-back" class="btn btn-small" data-i18n="back"></button>
+      <div class="setup-titles">
+        <div id="setup-title"></div>
+        <div id="setup-enemy" class="enemy-info"></div>
+      </div>
+      <div class="pill"><img class="pixel icon" src="assets/coin.png" alt=""><b id="setup-coins">0</b></div>
+    </header>
+    <p class="hint" data-i18n="setup_hint"></p>
+    </div>
+    <footer class="setup-bottom">
+      <div class="tray-head"><span data-i18n="tray"></span>
+        <div class="tray-tools">
+          <button id="btn-unplace" class="btn btn-small" data-i18n="unplace" disabled></button>
+          <button id="btn-clear" class="btn btn-small" data-i18n="clear"></button>
+          <button id="btn-auto" class="btn btn-small" data-i18n="auto"></button>
+        </div>
+      </div>
+      <div id="tray" class="tray"></div>
+      <button id="btn-start" class="btn btn-big btn-red" data-i18n="start"></button>
+    </footer>
+  </section>
+
+  <!-- BATTLE HUD -->
+  <section id="battle" class="screen hud" aria-label="battle">
+    <header class="topbar">
+      <div class="pill team-player"><img class="pixel icon" src="assets/player_badge.png" alt=""><span data-i18n="you"></span> <b id="hud-player">0</b></div>
+      <div class="pill" id="hud-stage"></div>
+      <div class="pill team-enemy"><img class="pixel icon" src="assets/enemy_badge.png" alt=""><span data-i18n="enemy"></span> <b id="hud-enemy">0</b></div>
+    </header>
+    <footer class="battle-bottom">
+      <button id="btn-speed" class="btn btn-small">x1</button>
+    </footer>
+  </section>
+
+  <!-- RESULT OVERLAY -->
+  <div id="result" class="overlay" hidden aria-live="polite">
+    <div class="result-card">
+      <h1 id="result-title"></h1>
+      <div class="result-coins"><img class="pixel icon-big" src="assets/coin.png" alt=""><span id="result-coins"></span></div>
+      <div class="result-actions">
+        <button id="btn-next" class="btn btn-big" data-i18n="next_stage"></button>
+        <button id="btn-retry" class="btn btn-big btn-red" data-i18n="retry"></button>
+        <button id="btn-result-home" class="btn" data-i18n="to_home"></button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" role="status"></div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
