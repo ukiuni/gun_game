@@ -220,3 +220,28 @@ test('対戦: Lv.2n の銃1台は Lv.n の銃2台に勝つ', () => {
     }
   }
 });
+
+test('部隊戦: 合体した部隊（Lv.2n × k/2）は合体前（Lv.n × k）より強い', () => {
+  const order = [2, 1, 3, 0, 4, 7, 6, 8, 5, 9, 12, 11, 13, 10, 14];
+  function score(levels, stage) {
+    const L = enemyLevelsForStage(stage), C = enemyCellsForStage(stage, L.length);
+    let wins = 0, dealt = 0;
+    for (let seed = 1; seed <= 3; seed++) {
+      const b = run(new Battle(levels.map((l, i) => ({ id: i + 1, level: l, cell: order[i] })),
+        L.map((l, i) => ({ id: i + 1, level: l, cell: C[i] })), { seed, enemyMult: enemyStatMultiplier(stage) }), 900);
+      if (b.winner === 'player') wins++;
+      const e = b.guns.filter((g) => g.team === 'enemy');
+      dealt += e.reduce((a, g) => a + (g.maxHp - g.hp), 0) / e.reduce((a, g) => a + g.maxHp, 0);
+    }
+    return { wins, dealt };
+  }
+  // stages chosen near the limit of the un-merged army, where the difference matters
+  const cases = [[8, 1, 5], [4, 2, 8], [8, 4, 11], [4, 10, 11], [6, 30, 17], [2, 50, 14], [4, 64, 17], [2, 99, 17], [4, 120, 20], [2, 250, 20], [2, 400, 23], [2, 500, 23]];
+  for (const [k, n, stage] of cases) {
+    const before = score(new Array(k).fill(n), stage);
+    const after = score(new Array(k / 2).fill(2 * n), stage);
+    const label = `${k}×Lv${n} → ${k / 2}×Lv${2 * n} @stage${stage}: ${JSON.stringify(before)} → ${JSON.stringify(after)}`;
+    expect(after.wins, label).toBeGreaterThanOrEqual(before.wins);
+    expect(after.wins > before.wins || after.dealt > before.dealt, label).toBe(true);
+  }
+});

@@ -44,12 +44,12 @@ const gunById = (id) => save.guns.find((g) => g.id === id);
 function rankIcon(level) { return `assets/gun_r${rankOf(level)}.png`; }
 
 let toastTimer = 0;
-function toast(msg) {
+function toast(msg, ms = 1600) {
   const el = $('#toast');
   el.textContent = msg;
   el.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 1600);
+  toastTimer = setTimeout(() => el.classList.remove('show'), ms);
 }
 
 function gunCard(gun, { stats = false } = {}) {
@@ -285,7 +285,8 @@ function placeGun(gun, to, fromCell) {
   if (result === 'merge') {
     sfx.merge();
     scene.spawnMergeEffect(to);
-    toast(t('merged', { level: occ.level }));
+    const st = statsOf(occ.level);
+    toast(t('merged', { level: occ.level, hp: st.maxHp.toLocaleString(), atk: st.atk.toLocaleString(), rate: (1 / st.interval).toFixed(1) }), 2600);
   } else if (result === 'swap') { sfx.place(); toast(t('swapped')); }
   else if (result === 'max') { sfx.error(); toast(t('max_level')); }
   else if (result === 'place') sfx.place();

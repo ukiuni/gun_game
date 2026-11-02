@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 import { openGame, toHome, toSetup, tapCell, dragCell, layoutOf, gunsOf, waitBattleEnd, layout } from './helpers.js';
 import { STRINGS, LANGS } from '../src/i18n.js';
 import { AIM_TOLERANCE, EXPLODE_TIME } from '../src/battle.js';
-import { coinReward } from '../src/gunstats.js';
+import { coinReward, statsOf } from '../src/gunstats.js';
 
 const JA = STRINGS.ja;
 
@@ -90,7 +90,11 @@ test.describe('配置と合体', () => {
     await tapCell(page, 7);
     await page.locator('#tray .gun-card[data-gun-id="2"]').click();
     await tapCell(page, 7);
-    await expect(page.locator('#toast')).toHaveText(JA.merged.replace('{level}', '2'));
+    const st2 = statsOf(2);
+    await expect(page.locator('#toast')).toHaveText(JA.merged.replace('{level}', '2').replace('{hp}', String(st2.maxHp))
+      .replace('{atk}', String(st2.atk)).replace('{rate}', (1 / st2.interval).toFixed(1)));
+    expect(st2.maxHp).toBeGreaterThan(2 * statsOf(1).maxHp); // the merged gun beats the two it was made of
+    expect(st2.atk).toBeGreaterThan(2 * statsOf(1).atk);
     let guns = await gunsOf(page);
     expect(guns.length).toBe(3);
     expect(guns.find((g) => g.id === 1).level).toBe(2);

@@ -34,7 +34,7 @@ export function rankInfo(level) {
 export const GROWTH = 1.3; // HP / attack exponent
 export const FIRE_RATE_GROWTH = 0.22; // shots per second grow with level^0.22
 export const BASE_INTERVAL = 1.0; // seconds between shots at Lv.1
-export const MIN_INTERVAL = 0.25;
+export const MIN_INTERVAL = 0.2; // never reached below Lv.1000, so every level fires faster than the one before
 
 export function fireInterval(level) {
   const l = clampLevel(level);
@@ -140,9 +140,9 @@ export function spreadAngle(level) {
   return +(0.25 + (MAX_SPREAD - 0.25) * ((l - 100) / (MAX_LEVEL - 100))).toFixed(4);
 }
 
-/** Damage of each bullet in a volley. More muzzles = more total damage (bullets on the edge of the fan may miss). */
-export function bulletDamage(atk, n) {
-  return Math.max(1, Math.round((atk * 2) / (n + 1)));
+/** Damage of each bullet in a volley: every bullet carries the full attack, so more muzzles = strictly more damage. */
+export function bulletDamage(atk, n) { // eslint-disable-line no-unused-vars
+  return atk;
 }
 
 /** Everything that changes with level: muzzles, fan spread, body size, bullet shape/size/count. */
