@@ -30,7 +30,13 @@ const state = {
   endTimer: 0,
   result: null,
   attempt: 0,
+  autoStreak: 0, // wins in a row during the current auto-battle run
+  autoTimer: 0,
+  autoDeadline: 0,
 };
+// Pause between an auto-battle victory and the next stage (shorter when the debug speed-up is used).
+let AUTO_DELAY_MS = Math.max(300, 3000 / debugSpeed);
+const resultsLog = []; // every finished battle (for the auto-battle history / tests)
 
 // ---------------- helpers ----------------
 function persist() { writeSave(save); }
@@ -64,6 +70,7 @@ function setScreen(name) {
   state.screen = name;
   document.body.dataset.screen = name;
   updateMargins();
+  renderAutoToggle();
 }
 
 /** Keep the 3D board inside the area that is not covered by the HTML UI. */
@@ -108,10 +115,12 @@ function refreshAll() {
   if (state.screen === 'battle') renderHud();
   if (state.result) renderResult();
   $('#btn-sound').textContent = `${t('sound')}: ${save.muted ? t('off') : t('on')}`;
+  renderAutoToggle();
 }
 
 // ---------------- title / home ----------------
 function goHome() {
+  cancelAutoCountdown();
   $('#result').hidden = true;
   state.result = null;
   state.battle = null;
@@ -180,6 +189,7 @@ function showBoardPreview() {
 }
 
 function enterSetup() {
+  cancelAutoCountdown();
   $('#result').hidden = true;
   state.result = null;
   state.battle = null;
@@ -346,7 +356,8 @@ canvas.addEventListener('pointerup', (e) => {
 });
 
 // ---------------- battle ----------------
-function startBattle() {
+function startBattle({ auto = false } = {}) {
+  if (!auto) state.autoStreak = 0;
   const units = playerUnits();
   if (!units.length) { sfx.error(); toast(t('need_gun')); return; }
   unlockAudio();
@@ -372,6 +383,7 @@ function renderHud() {
   $('#hud-enemy').textContent = b.present('enemy').length;
   $("#hud-stage").textContent = `${t("stage")} ${state.stage}`;
   $('#btn-speed').textContent = `${t('speed')} x${state.battleSpeed}`;
+  renderAutoToggle();
 }
 
 function finishBattle() {
@@ -382,10 +394,62 @@ function finishBattle() {
   save.coins += reward;
   if (win) { save.stage++; save.wins++; } else save.losses++;
   persist();
-  state.result = { win, reward, stage };
+  const auto = !!save.autoBattle;
+  if (auto && win) state.autoStreak++;
+  state.result = { win, reward, stage, auto, streak: state.autoStreak };
+  resultsLog.push({ ...state.result, attempt: state.attempt });
   (win ? sfx.win : sfx.lose)();
   renderResult();
   $('#result').hidden = false;
+  // auto battle: keep going after a win, stop at the first defeat
+  if (auto && win) startAutoCountdown();
+}
+
+// ---------------- auto battle (continue until defeat) ----------------
+function renderAutoToggle() {
+  const on = !!save.autoBattle;
+  $('#btn-auto-battle').setAttribute('aria-pressed', String(on));
+  $('#auto-battle-state').textContent = on ? t('on') : t('off');
+  const inBattle = state.screen === 'battle' && on;
+  $('#auto-badge').hidden = !inBattle;
+  $('#btn-auto-stop').hidden = !inBattle || !!state.result;
+  $('#auto-badge-text').textContent = t('auto_running', { n: state.autoStreak });
+}
+
+function setAutoBattle(on) {
+  save.autoBattle = !!on;
+  persist();
+  if (!on) cancelAutoCountdown();
+  renderAutoToggle();
+  if (state.result) renderResult();
+}
+
+function startAutoCountdown() {
+  cancelAutoCountdown();
+  state.autoDeadline = performance.now() + AUTO_DELAY_MS;
+  const tick = () => {
+    const left = Math.max(0, state.autoDeadline - performance.now());
+    $('#auto-countdown').textContent = t('auto_next', { s: Math.ceil(left / 1000) });
+    $('#auto-bar-fill').style.width = `${(1 - left / AUTO_DELAY_MS) * 100}%`;
+    if (left <= 0) { cancelAutoCountdown(); autoContinue(); }
+  };
+  $('#auto-panel').hidden = false;
+  tick();
+  state.autoTimer = setInterval(tick, 100);
+}
+
+function cancelAutoCountdown() {
+  if (state.autoTimer) clearInterval(state.autoTimer);
+  state.autoTimer = 0;
+  $('#auto-panel').hidden = true;
+}
+
+/** Go to the next stage with the same layout and start the battle right away. */
+function autoContinue() {
+  if (!save.autoBattle) return;
+  enterSetup();
+  if (!playerUnits().length) { setAutoBattle(false); return; }
+  startBattle({ auto: true });
 }
 
 function renderResult() {
@@ -396,6 +460,11 @@ function renderResult() {
   ov.dataset.result = r.win ? 'victory' : 'defeat';
   $('#result-title').textContent = r.win ? t('victory') : t('defeat');
   $('#result-coins').textContent = t('coins_earned', { n: r.reward });
+  const ended = r.auto && !r.win;
+  $('#auto-ended').hidden = !ended;
+  if (ended) $('#auto-ended').textContent = t('auto_ended', { n: r.streak });
+  if (r.win && state.autoTimer) $('#auto-countdown').textContent = t('auto_next', { s: Math.ceil(Math.max(0, state.autoDeadline - performance.now()) / 1000) });
+  renderAutoToggle();
 }
 
 // ---------------- main loop ----------------
@@ -442,7 +511,10 @@ $('#btn-unplace').addEventListener('click', () => {
   sfx.click();
   renderSetup();
 });
-$('#btn-start').addEventListener('click', startBattle);
+$('#btn-start').addEventListener('click', () => startBattle());
+$('#btn-auto-battle').addEventListener('click', () => { sfx.click(); setAutoBattle(!save.autoBattle); });
+$('#btn-auto-stop').addEventListener('click', () => { sfx.click(); setAutoBattle(false); });
+$('#btn-auto-cancel').addEventListener('click', () => { sfx.click(); setAutoBattle(false); });
 $('#btn-speed').addEventListener('click', () => { state.battleSpeed = state.battleSpeed >= 4 ? 1 : state.battleSpeed * 2; renderHud(); });
 $('#btn-next').addEventListener('click', () => { sfx.click(); enterSetup(); });
 $('#btn-retry').addEventListener('click', () => { sfx.click(); enterSetup(); });
@@ -476,4 +548,9 @@ window.__game = {
   setSave(obj) { save = { ...defaultSave(), ...obj }; persist(); refreshAll(); },
   resetSave() { clearSave(); save = defaultSave(); persist(); refreshAll(); },
   getLang,
+  get autoStreak() { return state.autoStreak; },
+  get resultsLog() { return resultsLog; },
+  get attempts() { return state.attempt; },
+  get autoCountdownActive() { return !!state.autoTimer; },
+  setAutoDelay(ms) { AUTO_DELAY_MS = ms; },
 };

@@ -14,6 +14,7 @@ export function defaultSave() {
     wins: 0,
     losses: 0,
     muted: false,
+    autoBattle: false,
   };
 }
 

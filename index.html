@@ -84,7 +84,10 @@
         </div>
       </div>
       <div id="tray" class="tray"></div>
-      <button id="btn-start" class="btn btn-big btn-red" data-i18n="start"></button>
+      <div class="start-row">
+        <button id="btn-auto-battle" class="btn btn-toggle" aria-pressed="false"><span data-i18n="auto_battle"></span><b id="auto-battle-state">OFF</b></button>
+        <button id="btn-start" class="btn btn-big btn-red" data-i18n="start"></button>
+      </div>
     </footer>
   </section>
 
@@ -96,6 +99,10 @@
       <div class="pill team-enemy"><img class="pixel icon" src="assets/enemy_badge.png" alt=""><span data-i18n="enemy"></span> <b id="hud-enemy">0</b></div>
     </header>
     <footer class="battle-bottom">
+      <div class="auto-hud">
+        <div id="auto-badge" class="pill auto-badge" hidden><span id="auto-badge-text"></span></div>
+        <button id="btn-auto-stop" class="btn btn-small" data-i18n="auto_stop" hidden></button>
+      </div>
       <button id="btn-speed" class="btn btn-small">x1</button>
     </footer>
   </section>
@@ -105,6 +112,12 @@
     <div class="result-card">
       <h1 id="result-title"></h1>
       <div class="result-coins"><img class="pixel icon-big" src="assets/coin.png" alt=""><span id="result-coins"></span></div>
+      <div id="auto-panel" class="auto-panel" hidden>
+        <p id="auto-countdown"></p>
+        <div class="auto-bar"><div id="auto-bar-fill"></div></div>
+        <button id="btn-auto-cancel" class="btn btn-small" data-i18n="auto_stop"></button>
+      </div>
+      <p id="auto-ended" class="auto-ended" hidden></p>
       <div class="result-actions">
         <button id="btn-next" class="btn btn-big" data-i18n="next_stage"></button>
         <button id="btn-retry" class="btn btn-big btn-red" data-i18n="retry"></button>
