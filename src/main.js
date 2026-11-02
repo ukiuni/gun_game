@@ -8,6 +8,7 @@ import {
   enemyLevelsForStage, enemyCellsForStage, enemyStatMultiplier, shopOffer, coinReward,
 } from './gunstats.js';
 import { sfx, unlockAudio, setMuted } from './sfx.js';
+import { registerServiceWorker, setupInstall, promptInstall } from './pwa.js';
 
 const $ = (s) => document.querySelector(s);
 const params = new URLSearchParams(location.search);
@@ -452,6 +453,14 @@ document.addEventListener('dblclick', (e) => e.preventDefault());
 setScreen('title');
 showBoardPreview();
 refreshAll();
+
+// ---------------- PWA ----------------
+registerServiceWorker();
+setupInstall((mode) => {
+  $('#btn-install').hidden = mode !== 'prompt';
+  $('#install-hint').hidden = mode !== 'ios';
+});
+$('#btn-install').addEventListener('click', async () => { sfx.click(); $('#btn-install').hidden = true; await promptInstall(); });
 
 // ---------------- debug / test hooks ----------------
 window.__game = {

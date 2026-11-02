@@ -84,6 +84,8 @@ body[data-screen="battle"] #battle { display: flex; }
 .gun-card .st { font-size: 10px; color: var(--muted); }
 .home-actions { display: flex; flex-direction: column; gap: 10px; }
 .home-sub { display: flex; justify-content: space-between; align-items: center; }
+.install-hint { margin: 0; font-size: 12px; color: var(--muted); text-align: center; }
+[hidden] { display: none !important; }
 
 /* setup */
 .setup-titles { text-align: center; flex: 1; }

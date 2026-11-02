@@ -10,8 +10,10 @@
   <meta name="apple-mobile-web-app-title" content="Gun Merge 3D">
   <title>Gun Merge 3D</title>
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="icon" href="assets/gun_r7.png">
-  <link rel="apple-touch-icon" href="assets/gun_r7.png">
+  <meta name="description" content="銃を合体させて敵陣を撃破する 3D バトルゲーム">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
@@ -55,6 +57,8 @@
         </label>
         <button id="btn-sound" class="btn btn-small"></button>
       </div>
+      <button id="btn-install" class="btn btn-small" data-i18n="install" hidden></button>
+      <p id="install-hint" class="install-hint" data-i18n="install_ios" hidden></p>
     </footer>
   </section>
 

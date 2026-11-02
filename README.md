@@ -37,6 +37,19 @@ npm start            # http://localhost:8080/
 スマホ実機では同じ LAN から `http://<PCのIP>:8080/` を開いてください。
 `?speed=4` を付けるとバトルを早送りできます（デバッグ用）。
 
+## PWA
+- ホーム画面に追加すると、全画面のアプリとして起動します（Android: ホーム画面の「アプリとしてインストール」ボタン / iPhone・iPad: Safari の共有 →「ホーム画面に追加」）。
+- Service Worker（`sw.js`）がゲームのファイルをキャッシュするので、一度開けばオフラインでも遊べます。
+- アイコンは `node tools/gen_icons.mjs` でドット絵から生成しています（`icons/`）。
+
+## GitHub Pages への公開
+`main` ブランチに push すると、`.github/workflows/pages.yml` が次の順に実行します。
+1. Playwright で全テストを実行（失敗したら公開しない）
+2. `node tools/build-site.mjs` で公開用の `_site/` を作成（Service Worker のキャッシュ名にコミット SHA を埋め込み、更新が確実に反映されるようにする）
+3. GitHub Pages にデプロイ
+
+リポジトリの Settings → Pages → Source が「GitHub Actions」になっている必要があります。
+
 ## テスト
 ```bash
 npx playwright test
@@ -53,3 +66,5 @@ Android (Pixel 7 / Chromium)、iPhone 15 (WebKit)、iPad (WebKit) のエミュ�
 - `src/i18n.js` — 多言語文字列
 - `assets/` — ドット絵（Codex が `tools/gen_pixel_art.mjs` で生成）
 - `vendor/three.module.js` — Three.js r170
+- `sw.js`, `manifest.webmanifest`, `src/pwa.js`, `icons/` — PWA
+- `tools/build-site.mjs`, `.github/workflows/pages.yml` — GitHub Pages 公開

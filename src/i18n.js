@@ -9,6 +9,8 @@ export const LANGS = {
 
 const STR = {
   ja: {
+    install: "アプリとしてインストール",
+    install_ios: "Safari の共有ボタン →「ホーム画面に追加」でアプリとして遊べます",
     subtitle: '銃を合体させて敵陣を撃破せよ！',
     tap_to_start: 'タップしてスタート',
     language: '言語',
@@ -53,6 +55,8 @@ const STR = {
     rotate_hint: '画面を縦向きにしてください',
   },
   en: {
+    install: "Install as App",
+    install_ios: "In Safari tap Share → \"Add to Home Screen\" to play as an app",
     subtitle: 'Merge your guns and destroy the enemy camp!',
     tap_to_start: 'Tap to Start',
     language: 'Language',
@@ -97,6 +101,8 @@ const STR = {
     rotate_hint: 'Please rotate to portrait',
   },
   zh: {
+    install: "安装为应用",
+    install_ios: "在 Safari 中点击分享 →“添加到主屏幕”即可作为应用游玩",
     subtitle: '合成枪械，摧毁敌方阵地！',
     tap_to_start: '点击开始',
     language: '语言',
@@ -141,6 +147,8 @@ const STR = {
     rotate_hint: '请竖屏游玩',
   },
   ko: {
+    install: "앱으로 설치",
+    install_ios: "Safari에서 공유 → '홈 화면에 추가'로 앱처럼 플레이할 수 있습니다",
     subtitle: '총을 합체해서 적 진지를 격파하라!',
     tap_to_start: '탭하여 시작',
     language: '언어',
@@ -185,6 +193,8 @@ const STR = {
     rotate_hint: '세로 모드로 플레이해 주세요',
   },
   es: {
+    install: "Instalar como app",
+    install_ios: "En Safari toca Compartir → \"Añadir a pantalla de inicio\" para jugar como app",
     subtitle: '¡Fusiona tus armas y destruye el campamento enemigo!',
     tap_to_start: 'Toca para empezar',
     language: 'Idioma',

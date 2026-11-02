@@ -6,6 +6,7 @@ export default defineConfig({
   timeout: 90_000,
   expect: { timeout: 15_000 },
   fullyParallel: true,
+  retries: process.env.CI ? 1 : 0,
   reporter: [['list']],
   use: { baseURL: `http://localhost:${PORT}/`, trace: 'retain-on-failure' },
   webServer: { command: `node tools/server.mjs ${PORT}`, url: `http://localhost:${PORT}/`, reuseExistingServer: true },
