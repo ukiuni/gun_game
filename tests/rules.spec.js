@@ -2,7 +2,7 @@
 import { test, expect } from '@playwright/test';
 import {
   rankOf, canMerge, mergedLevel, MAX_LEVEL, statsOf, enemyLevelsForStage, enemyStatMultiplier, coinReward, enemyCellsForStage,
-  gunDesign, barrelCount, BULLET_SHAPES, spreadAngle, bulletDamage, MAX_SPREAD,
+  gunDesign, barrelCount, BULLET_SHAPES, spreadAngle, bulletDamage, MAX_SPREAD, dpsOf, fireInterval,
 } from '../src/gunstats.js';
 import { Battle, AIM_TOLERANCE, EXPLODE_TIME, wrapAngle, yawTo } from '../src/battle.js';
 
@@ -180,4 +180,43 @@ test('放射状の弾丸が複数の敵に同時に命中する', () => {
   const vol = new Set(atk().projectiles);
   const hits = b.events.filter((e) => e.type === 'hit' && vol.has(e.projectile));
   expect(new Set(hits.map((h) => h.target)).size).toBeGreaterThanOrEqual(3);
+});
+
+test('合体: Lv.2n の銃は Lv.n の銃2台分より強い（HP・攻撃力・毎秒ダメージ）', () => {
+  for (let n = 1; 2 * n <= MAX_LEVEL; n++) {
+    const a = statsOf(n), b = statsOf(2 * n);
+    expect(b.maxHp, `HP Lv${2 * n} vs 2×Lv${n}`).toBeGreaterThan(2 * a.maxHp);
+    expect(b.atk, `ATK Lv${2 * n} vs 2×Lv${n}`).toBeGreaterThan(2 * a.atk);
+    expect(dpsOf(2 * n), `DPS Lv${2 * n} vs 2×Lv${n}`).toBeGreaterThan(2 * dpsOf(n));
+  }
+});
+
+test('レベルが上がるほど弾丸の発射頻度が上がる', () => {
+  for (let l = 2; l <= MAX_LEVEL; l++) expect(fireInterval(l)).toBeLessThanOrEqual(fireInterval(l - 1));
+  expect(fireInterval(2)).toBeLessThan(fireInterval(1)); // the very first merge already fires faster
+  for (let n = 1; 2 * n <= 400; n++) expect(fireInterval(2 * n)).toBeLessThan(fireInterval(n));
+  expect(1 / fireInterval(1)).toBeCloseTo(1, 5); // 1 shot/s at Lv.1
+  expect(1 / fireInterval(1000)).toBeGreaterThanOrEqual(3.9); // ~4 shots/s at Lv.1000
+  // real battle: a merged gun actually shoots more often
+  const shotsIn = (level) => {
+    const b = new Battle([{ id: 1, level, cell: 2 }], [{ id: 1, level: 1000, cell: 2 }], { seed: 9 });
+    b.guns[1].hp = b.guns[1].maxHp = 1e15; // invulnerable target
+    b.guns[1].atk = 0;
+    for (let i = 0; i < 60 * 10; i++) b.step(1 / 60);
+    return b.guns[0].shots;
+  };
+  expect(shotsIn(2)).toBeGreaterThan(shotsIn(1));
+  expect(shotsIn(100)).toBeGreaterThan(shotsIn(10));
+});
+
+test('対戦: Lv.2n の銃1台は Lv.n の銃2台に勝つ', () => {
+  for (const n of [1, 2, 3, 5, 10, 25, 50, 100, 250, 500]) {
+    for (const seed of [1, 2, 3]) {
+      for (const [pc, ecs] of [[2, [1, 3]], [2, [0, 4]], [7, [2, 7]]]) {
+        const b = new Battle([{ id: 1, level: 2 * n, cell: pc }], ecs.map((c, i) => ({ id: i + 1, level: n, cell: c })), { seed });
+        run(b, 600);
+        expect(b.winner, `Lv${2 * n} vs 2×Lv${n} seed${seed} ${pc}/${ecs}`).toBe('player');
+      }
+    }
+  }
 });

@@ -28,17 +28,37 @@ export function rankInfo(level) {
   return RANKS[rankOf(level) - 1];
 }
 
+// Stats grow faster than linearly with level (exponent > 1), so merging always pays off:
+// one Lv.2n gun has more than double the HP, attack and fire rate of a Lv.n gun,
+// i.e. it is clearly stronger than two Lv.n guns together.
+export const GROWTH = 1.3; // HP / attack exponent
+export const FIRE_RATE_GROWTH = 0.22; // shots per second grow with level^0.22
+export const BASE_INTERVAL = 1.0; // seconds between shots at Lv.1
+export const MIN_INTERVAL = 0.25;
+
+export function fireInterval(level) {
+  const l = clampLevel(level);
+  return +Math.max(MIN_INTERVAL, BASE_INTERVAL * Math.pow(l, -FIRE_RATE_GROWTH)).toFixed(3);
+}
+
 export function statsOf(level) {
   const l = clampLevel(level);
   const r = rankOf(l);
   return {
     level: l,
     rank: r,
-    maxHp: 100 + 30 * (l - 1),
-    atk: 12 + 4 * (l - 1),
-    interval: +(1.1 - 0.07 * (r - 1)).toFixed(3), // seconds between shots
+    maxHp: Math.round(100 * Math.pow(l, GROWTH)),
+    atk: Math.round(12 * Math.pow(l, GROWTH)),
+    interval: fireInterval(l), // seconds between shots (shorter = more shots per second)
     turnSpeed: 2.2 + 0.25 * (r - 1), // radians / second
   };
+}
+
+/** Total damage per second of one gun (all bullets of a volley), used for balance checks. */
+export function dpsOf(level) {
+  const s = statsOf(level);
+  const n = barrelCount(level);
+  return (bulletDamage(s.atk, n) * n) / s.interval;
 }
 
 /** Can gun `a` be stacked onto gun `b`? */
