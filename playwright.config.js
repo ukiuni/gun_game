@@ -3,7 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 const PORT = 8123;
 export default defineConfig({
   testDir: './tests',
-  timeout: 90_000,
+  timeout: process.env.CI ? 180_000 : 90_000, // CI runners render WebGL in software (slow)
   expect: { timeout: 15_000 },
   fullyParallel: true,
   retries: process.env.CI ? 1 : 0,

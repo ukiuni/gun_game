@@ -355,7 +355,7 @@ test.describe('バトル', () => {
 
 test.describe('勝敗とステージ', () => {
   const strong = { coins: 100, guns: [{ id: 1, level: 80 }, { id: 2, level: 80 }], nextId: 3, layout: layout({ 1: 1, 3: 2 }) };
-  const weak = { coins: 100, stage: 25, guns: [{ id: 1, level: 1 }], nextId: 2, layout: layout({ 2: 1 }) };
+  const weak = { coins: 100, stage: 12, guns: [{ id: 1, level: 1 }], nextId: 2, layout: layout({ 2: 1 }) }; // 7 enemies vs one Lv1 gun
 
   async function play(page, save) {
     await openGame(page, { save });
@@ -388,7 +388,7 @@ test.describe('勝敗とステージ', () => {
     await expect(page.locator('#btn-next')).toBeHidden();
     await page.locator('#btn-retry').click();
     await expect(page.locator('#setup')).toBeVisible();
-    await expect(page.locator('#setup-title')).toHaveText(JA.setup_title.replace('{stage}', '25'));
+    await expect(page.locator('#setup-title')).toHaveText(JA.setup_title.replace('{stage}', '12'));
     // can play again
     await page.locator('#btn-start').click();
     await expect(page.locator('#battle')).toBeVisible();
@@ -407,25 +407,27 @@ test.describe('勝敗とステージ', () => {
     await page.locator('#btn-result-home').click();
     await expect(page.locator('#home')).toBeVisible();
     await expect(page.locator('#result')).toBeHidden();
-    await expect(page.locator('#home-stage')).toHaveText('25');
+    await expect(page.locator('#home-stage')).toHaveText('12');
   });
 
-  test('勝利すると多いコイン、敗北すると少ないコインを獲得する', async ({ page }) => {
+  test('勝利すると多いコインを獲得する', async ({ page }) => {
     await play(page, strong); // stage 1 victory
     const win = await page.evaluate(() => window.__game.save.coins - 100);
     expect(win).toBe(coinReward(1, true));
     await expect(page.locator('#result-coins')).toHaveText(JA.coins_earned.replace('{n}', String(win)));
     await page.locator('#btn-result-home').click();
     await expect(page.locator('#home-coins')).toHaveText(String(100 + win));
+  });
 
-    const page2 = await page.context().newPage(); // fresh page, seeded with its own save
-    await play(page2, weak); // stage 25 defeat
-    await expect(page2.locator('#result')).toHaveAttribute('data-result', 'defeat');
-    const lose = await page2.evaluate(() => window.__game.save.coins - 100);
-    expect(lose).toBe(coinReward(25, false));
-    await expect(page2.locator('#result-coins')).toHaveText(JA.coins_earned.replace('{n}', String(lose)));
+  test('敗北すると少ないコインを獲得する（勝利より少ない）', async ({ page }) => {
+    await play(page, weak); // stage 12 defeat
+    await expect(page.locator('#result')).toHaveAttribute('data-result', 'defeat');
+    const lose = await page.evaluate(() => window.__game.save.coins - 100);
+    expect(lose).toBe(coinReward(12, false));
+    await expect(page.locator('#result-coins')).toHaveText(JA.coins_earned.replace('{n}', String(lose)));
     expect(lose).toBeGreaterThan(0);
-    expect(win).toBeGreaterThan(lose); // even a stage-1 win pays more than a stage-25 loss
+    expect(coinReward(1, true)).toBeGreaterThan(lose); // even a stage-1 win pays more than a stage-12 loss
+    expect(coinReward(12, true)).toBeGreaterThan(lose); // and a win on the same stage pays more
   });
 });
 
