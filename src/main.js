@@ -4,7 +4,7 @@ import { CELLS, COLS } from './layout.js';
 import { t, setLang, getLang, detectLang, LANGS, applyI18n } from './i18n.js';
 import { loadSave, writeSave, defaultSave, clearSave } from './storage.js';
 import {
-  rankOf, rankInfo, statsOf, canMerge, mergedLevel, MAX_LEVEL,
+  rankOf, rankInfo, statsOf, canMerge, barrelCount, mergedLevel, MAX_LEVEL,
   enemyLevelsForStage, enemyCellsForStage, enemyStatMultiplier, shopOffer, coinReward,
 } from './gunstats.js';
 import { sfx, unlockAudio, setMuted } from './sfx.js';
@@ -56,7 +56,7 @@ function gunCard(gun, { stats = false } = {}) {
   el.dataset.level = gun.level;
   el.style.setProperty('--rank', info.css);
   el.innerHTML = `<img class="pixel" src="${rankIcon(gun.level)}" alt=""><span class="lv">Lv.${gun.level}</span><span class="rk">${t('rank')} ${info.name}</span>` +
-    (stats ? `<span class="st">${t('stats', { hp: s.maxHp, atk: s.atk })}</span>` : '');
+    (stats ? `<span class="st">${t('stats', { hp: s.maxHp, atk: s.atk, n: barrelCount(gun.level) })}</span>` : '');
   return el;
 }
 

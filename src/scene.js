@@ -57,6 +57,16 @@ export class GameScene {
     this.buildBoard();
 
     this.gunMeshes = new Map(); // key -> group
+    this.bulletCache = new Map();
+    this.impactIdx = 0;
+    // fixed pool of explosion lights: the light count never changes, so shaders are never recompiled mid-battle
+    this.lightPool = Array.from({ length: 3 }, () => {
+      const l = new THREE.PointLight(0xffa040, 0, 6);
+      l.position.set(0, -10, 0);
+      this.scene.add(l);
+      return l;
+    });
+    this.lightIdx = 0;
     this.projMeshes = new Map();
     this.effects = [];
     this.selected = null;
@@ -197,28 +207,40 @@ export class GameScene {
     const barrels = new THREE.Group();
     turret.add(barrels);
     const design = gunDesign(level);
-    const n = design.barrels; // one bullet per barrel
+    const n = design.barrels; // muzzles = floor(level/100)+1, one bullet each
     const len = design.barrelLen;
-    for (let i = 0; i < n; i++) {
-      const b = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.11, len), lam(0x2a2a33));
-      b.position.set((i - (n - 1) / 2) * design.spacing, 0.2, 0.28 + len / 2);
+    const w = design.barrelWidth;
+    const barrelGeo = new THREE.BoxGeometry(w, w, len);
+    const tipGeo = new THREE.BoxGeometry(w * 1.3, w * 1.3, 0.08);
+    const barrelMat = lam(0x2a2a33);
+    const tipMat = lam(info.color);
+    const muzzles = [];
+    const muzzleMat = new THREE.SpriteMaterial({ map: this.textures.muzzle, transparent: true, depthWrite: false });
+    design.barrelAngles.forEach((a, i) => {
+      // each barrel points outward along its own fan angle
+      const arm = new THREE.Group();
+      arm.rotation.y = a;
+      barrels.add(arm);
+      const b = new THREE.Mesh(barrelGeo, barrelMat);
+      b.position.set(0, 0.2, design.barrelBase + len / 2);
       b.castShadow = true;
-      barrels.add(b);
-      const tip = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 0.08), lam(info.color));
-      tip.position.set(b.position.x, 0.2, 0.28 + len);
-      barrels.add(tip);
-    }
+      arm.add(b);
+      const tip = new THREE.Mesh(tipGeo, tipMat);
+      tip.position.set(0, 0.2, design.barrelBase + len);
+      arm.add(tip);
+      const muzzle = new THREE.Sprite(muzzleMat);
+      muzzle.position.set(0, 0.2, design.barrelBase + len + 0.12);
+      muzzle.scale.setScalar(n > 1 ? 0.42 : 0.55);
+      muzzle.visible = false;
+      arm.add(muzzle);
+      muzzles.push(muzzle);
+    });
     if (r >= 7) {
       const crown = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.14, 0.3), lam(0xfff1a8, { emissive: 0xffd34d, emissiveIntensity: 0.6 }));
       crown.position.y = 0.55;
       turret.add(crown);
     }
-
-    const muzzle = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.textures.muzzle, transparent: true, depthWrite: false }));
-    muzzle.position.set(0, 0.2, 0.36 + len);
-    muzzle.scale.setScalar(0.45 + n * 0.12);
-    muzzle.visible = false;
-    turret.add(muzzle);
+    const muzzle = muzzles[design.aimIndex];
 
     const scale = design.bodyScale;
     body.scale.setScalar(scale);
@@ -244,7 +266,7 @@ export class GameScene {
     hpFg.visible = false;
     group.add(hpFg);
 
-    group.userData = { team, level, design, barrelCount: n, body, turret, barrels, muzzle, label, hpBg, hpFg, baseScale: scale, materials: [] };
+    group.userData = { team, level, design, barrelCount: n, body, turret, barrels, muzzle, muzzles, label, hpBg, hpFg, baseScale: scale, materials: [] };
     group.traverse((o) => {
       if (!o.material) return;
       if (o.material.emissive) o.material.userData.baseEmissive = o.material.emissive.getHex();
@@ -267,7 +289,7 @@ export class GameScene {
   clearGuns() {
     for (const g of this.gunMeshes.values()) this.disposeGroup(g);
     this.gunMeshes.clear();
-    for (const m of this.projMeshes.values()) this.disposeGroup(m);
+    for (const m of this.projMeshes.values()) this.scene.remove(m); // shared bullet geometry stays cached
     this.projMeshes.clear();
   }
 
@@ -281,7 +303,7 @@ export class GameScene {
       const w = want.get(key);
       if (!w || w.level !== g.userData.level || g.userData.inBattle) { this.disposeGroup(g); this.gunMeshes.delete(key); }
     }
-    for (const m of this.projMeshes.values()) this.disposeGroup(m);
+    for (const m of this.projMeshes.values()) this.scene.remove(m); // shared bullet geometry stays cached
     this.projMeshes.clear();
     for (const [key, u] of want) {
       let g = this.gunMeshes.get(key);
@@ -301,6 +323,7 @@ export class GameScene {
   startBattle(battle) {
     this.clearGuns();
     this.battle = battle;
+    this.impactIdx = 0;
     for (const gun of battle.guns) {
       const g = this.makeGun(gun.team, gun.level);
       g.position.set(gun.x, 0, gun.z);
@@ -319,6 +342,16 @@ export class GameScene {
 
   // ---------- effects ----------
   // ---------- bullets: shape / size / colour change with rank & level ----------
+  /** Bullets share geometry/materials per (shape, size, colour) so big fans of bullets stay cheap on phones. */
+  bulletFromCache(shape, size, color, team) {
+    const key = `${shape}|${size}|${color}|${team}`;
+    let tpl = this.bulletCache.get(key);
+    if (!tpl) { tpl = this.makeBullet(shape, size, color, team); this.bulletCache.set(key, tpl); }
+    const m = tpl.clone(); // shares geometry & material
+    if (tpl.userData.spinner) m.userData.spinner = m.children[tpl.children.indexOf(tpl.userData.spinner)];
+    return m;
+  }
+
   makeBullet(shape, size, color, team) {
     const g = new THREE.Group();
     const col = shape === 'pellet' ? (team === 'player' ? 0x9fd0ff : 0xffb0a0) : color;
@@ -391,9 +424,12 @@ export class GameScene {
     sp.position.set(x, 0.6, z);
     sp.scale.setScalar(big ? 2.2 : 0.4 + bulletSize * 4);
     this.scene.add(sp);
-    const light = new THREE.PointLight(0xffa040, big ? 30 : 6, 6);
-    light.position.set(x, 1, z);
-    this.scene.add(light);
+    let light = null;
+    if (big) {
+      light = this.lightPool[this.lightIdx++ % this.lightPool.length];
+      light.intensity = 30;
+      light.position.set(x, 1, z);
+    }
     const parts = [];
     if (big) {
       const geo = new THREE.BoxGeometry(0.12, 0.12, 0.12);
@@ -452,8 +488,9 @@ export class GameScene {
       const rk = gun.recoilT / RECOIL_TIME;
       ud.barrels.position.z = -0.18 * rk;
       ud.turret.position.y = 0.26 + 0.04 * rk;
-      ud.muzzle.visible = rk > 0.45;
-      if (ud.muzzle.visible) ud.muzzle.material.rotation = Math.random() * Math.PI;
+      const flashOn = rk > 0.45;
+      for (const mz of ud.muzzles) mz.visible = flashOn;
+      if (flashOn) ud.muzzles[0].material.rotation = Math.random() * Math.PI; // material shared by all muzzles
       // hit flash
       const flash = gun.hitT > 0;
       if (flash !== ud.flashing) {
@@ -481,7 +518,7 @@ export class GameScene {
         live.add(p.id);
         let m = this.projMeshes.get(p.id);
         if (!m) {
-          m = this.makeBullet(p.shape, p.size, p.color, p.team);
+          m = this.bulletFromCache(p.shape, p.size, p.color, p.team);
           m.rotation.y = Math.atan2(p.vx, p.vz);
           m.userData.size = p.size;
           m.userData.owner = p.owner;
@@ -493,7 +530,12 @@ export class GameScene {
         m.position.set(p.x, 0.62, p.z);
       }
       for (const [id, m] of this.projMeshes) {
-        if (!live.has(id)) { this.spawnExplosion(m.position.x, m.position.z, false, m.userData.size); this.disposeGroup(m); this.projMeshes.delete(id); }
+        if (!live.has(id)) { this.scene.remove(m); this.projMeshes.delete(id); } // geometry/material are shared (cache)
+      }
+      // small hit sparks only where a bullet actually hit an enemy
+      for (; this.impactIdx < b.impacts.length; this.impactIdx++) {
+        const h = b.impacts[this.impactIdx];
+        if (this.effects.length < 80) this.spawnExplosion(h.x, h.z, false, h.size);
       }
     }
 
@@ -505,7 +547,7 @@ export class GameScene {
         const frame = Math.min(7, Math.floor(k * 8));
         e.sp.material.map.offset.x = frame / 8;
         e.sp.material.opacity = 1 - Math.max(0, k - 0.75) * 4;
-        e.light.intensity *= 0.9;
+        if (e.light) e.light.intensity *= 0.9;
         for (const m of e.parts) {
           m.userData.v.y -= 12 * dt;
           m.position.addScaledVector(m.userData.v, dt);
@@ -517,7 +559,7 @@ export class GameScene {
       }
       if (k >= 1) {
         if (e.sp) { this.scene.remove(e.sp); e.sp.material.map.dispose(); e.sp.material.dispose(); }
-        if (e.light) this.scene.remove(e.light);
+        if (e.light) e.light.intensity = 0;
         if (e.parts) e.parts.forEach((m) => { this.scene.remove(m); m.material.dispose(); });
         if (e.mesh) this.disposeGroup(e.mesh);
         return false;

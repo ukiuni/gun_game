@@ -103,36 +103,58 @@ export function coinReward(stage, win) {
 }
 
 // ---- Visual / weapon design that changes with power-ups ----
-// Barrel count per rank. One bullet is fired from EACH barrel per attack.
-export const BARRELS_BY_RANK = [1, 1, 2, 2, 3, 3, 4];
 // Bullet shape per rank (rendered by scene.js).
 export const BULLET_SHAPES = ['pellet', 'bullet', 'orb', 'crystal', 'missile', 'plasma', 'star'];
 const BULLET_BASE_SIZE = [0.07, 0.09, 0.11, 0.13, 0.15, 0.17, 0.2];
+export const MAX_SPREAD = 2.6; // radians (~149°) total fan width at Lv.1000
 
+/** Number of muzzles (barrels) = floor(level / 100) + 1. One bullet is fired from EACH muzzle per attack. */
 export function barrelCount(level) {
-  return BARRELS_BY_RANK[rankOf(level) - 1];
+  return Math.floor(clampLevel(level) / 100) + 1;
 }
 
-/** Everything that changes with level: barrels, body size, bullet shape/size/count. */
+/** Total fan angle (radians) the bullets are spread over. Grows with level; 0 with a single muzzle. */
+export function spreadAngle(level) {
+  const l = clampLevel(level);
+  if (barrelCount(l) < 2) return 0;
+  return +(0.25 + (MAX_SPREAD - 0.25) * ((l - 100) / (MAX_LEVEL - 100))).toFixed(4);
+}
+
+/** Damage of each bullet in a volley. More muzzles = more total damage (bullets on the edge of the fan may miss). */
+export function bulletDamage(atk, n) {
+  return Math.max(1, Math.round((atk * 2) / (n + 1)));
+}
+
+/** Everything that changes with level: muzzles, fan spread, body size, bullet shape/size/count. */
 export function gunDesign(level) {
   const l = clampLevel(level);
   const info = rankInfo(l);
   const r = info.rank;
   const progress = info.max > info.min ? (l - info.min) / (info.max - info.min) : 1; // 0..1 inside the rank
-  const barrels = BARRELS_BY_RANK[r - 1];
+  const barrels = barrelCount(l);
+  const spread = spreadAngle(l);
+  const step = barrels > 1 ? spread / (barrels - 1) : 0;
+  // Muzzles are arranged radially (a fan) around the turret's forward axis.
+  const barrelAngles = Array.from({ length: barrels }, (_, i) => +((i - (barrels - 1) / 2) * step).toFixed(5));
+  // The muzzle closest to the centre is the one that is aimed exactly at the target
+  // (for an even count the turret turns by half a step so that one muzzle points at the target).
+  const aimIndex = Math.floor((barrels - 1) / 2);
   const barrelLen = 0.55 + r * 0.04;
   const bodyScale = 0.95 + r * 0.04;
-  const spacing = 0.15;
+  const barrelBase = 0.22; // distance from the turret centre where barrels start
   return {
     level: l,
     rank: r,
     barrels,
+    spread,
+    barrelAngles,
+    aimIndex,
+    aimOffset: barrelAngles[aimIndex],
     barrelLen,
+    barrelBase,
+    barrelWidth: Math.max(0.06, 0.11 - (barrels - 1) * 0.005),
     bodyScale,
-    spacing,
-    // lateral offsets of each barrel in turret space (already scaled to world units)
-    barrelOffsets: Array.from({ length: barrels }, (_, i) => (i - (barrels - 1) / 2) * spacing * bodyScale),
-    muzzleDist: (0.36 + barrelLen) * bodyScale,
+    muzzleDist: (barrelBase + barrelLen + 0.06) * bodyScale,
     bullet: {
       shape: BULLET_SHAPES[r - 1],
       // grows with level inside the rank, approaching (but never reaching) the next rank's size

@@ -1,5 +1,5 @@
 // Deterministic battle simulation (no rendering). The renderer reads its state every frame.
-import { statsOf, mulberry32, gunDesign } from './gunstats.js';
+import { statsOf, mulberry32, gunDesign, bulletDamage } from './gunstats.js';
 import { cellPos } from './layout.js';
 
 export const AIM_TOLERANCE = 0.04; // radians: turret must face the target this closely before firing
@@ -30,6 +30,7 @@ export class Battle {
     this.time = 0;
     this.events = [];
     this.projectiles = [];
+    this.impacts = []; // {id, x, z, size} of bullets that hit an enemy (for hit effects)
     this.finished = false;
     this.winner = null; // 'player' | 'enemy' | 'draw'
     this.nextProjectileId = 1;
@@ -98,34 +99,34 @@ export class Battle {
     return best;
   }
 
-  /** Attack: one bullet from every barrel. Total damage of a volley = atk (split across bullets). */
+  /** Attack: one bullet from every muzzle at the same time, flying out radially (fan). */
   fire(g, target, yawError) {
     g.cooldown = g.interval;
     g.recoilT = RECOIL_TIME;
     g.shots++;
     const d = g.design;
-    const dx = Math.sin(g.yaw), dz = Math.cos(g.yaw);
-    // turret-local +x expressed in world space
-    const rx = Math.cos(g.yaw), rz = -Math.sin(g.yaw);
     const n = d.barrels;
-    const per = Math.floor(g.atk / n);
+    const dmg = bulletDamage(g.atk, n);
     const ids = [];
+    const angles = [];
     for (let i = 0; i < n; i++) {
-      const off = d.barrelOffsets[i];
-      const dmg = per + (i < g.atk - per * n ? 1 : 0); // distribute the remainder so the sum is exactly atk
+      const dir = g.yaw + d.barrelAngles[i];
+      const dx = Math.sin(dir), dz = Math.cos(dir);
       const p = {
         id: this.nextProjectileId++, owner: g.uid, team: g.team, dmg,
-        x: g.x + dx * d.muzzleDist + rx * off, z: g.z + dz * d.muzzleDist + rz * off,
-        vx: dx * PROJECTILE_SPEED, vz: dz * PROJECTILE_SPEED,
+        x: g.x + dx * d.muzzleDist, z: g.z + dz * d.muzzleDist,
+        vx: dx * PROJECTILE_SPEED, vz: dz * PROJECTILE_SPEED, dir: wrapAngle(dir),
         passed: new Set(), dead: false, rank: g.rank, level: g.level,
         shape: d.bullet.shape, size: d.bullet.size, color: d.bullet.color, barrel: i, volley: g.shots,
       };
       this.projectiles.push(p);
       ids.push(p.id);
+      angles.push(p.dir);
     }
     this.log('attack', {
       attacker: g.uid, target: target.uid, team: g.team, yaw: g.yaw, yawError,
-      projectile: ids[0], projectiles: ids, bulletCount: n, barrels: n, shape: d.bullet.shape, size: d.bullet.size,
+      projectile: ids[d.aimIndex], projectiles: ids, bulletCount: n, barrels: n, angles, spread: d.spread,
+      dmgPerBullet: dmg, shape: d.bullet.shape, size: d.bullet.size,
     });
   }
 
@@ -153,7 +154,8 @@ export class Battle {
       g.cooldown -= dt;
       const t = g.target;
       if (!t) continue;
-      const desired = yawTo(g.x, g.z, t.x, t.z);
+      // turret yaw that makes the aiming muzzle point straight at the target
+      const desired = wrapAngle(yawTo(g.x, g.z, t.x, t.z) - g.design.aimOffset);
       const diff = wrapAngle(desired - g.yaw);
       const maxTurn = g.turnSpeed * dt;
       const turn = Math.abs(diff) <= maxTurn ? diff : Math.sign(diff) * maxTurn;
@@ -191,6 +193,7 @@ export class Battle {
             continue;
           }
           this.applyHit(this.get(p.owner), g, p.dmg);
+          this.impacts.push({ id: p.id, x: p.x, z: p.z, size: p.size });
           this.log('hit', { projectile: p.id, owner: p.owner, target: g.uid });
           p.dead = true;
           break;

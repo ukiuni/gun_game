@@ -2,7 +2,7 @@
 import { test, expect } from '@playwright/test';
 import {
   rankOf, canMerge, mergedLevel, MAX_LEVEL, statsOf, enemyLevelsForStage, enemyStatMultiplier, coinReward, enemyCellsForStage,
-  gunDesign, barrelCount, BULLET_SHAPES,
+  gunDesign, barrelCount, BULLET_SHAPES, spreadAngle, bulletDamage, MAX_SPREAD,
 } from '../src/gunstats.js';
 import { Battle, AIM_TOLERANCE, EXPLODE_TIME, wrapAngle, yawTo } from '../src/battle.js';
 
@@ -97,16 +97,43 @@ test('角度ユーティリティ', () => {
   expect(yawTo(0, 0, 1, 0)).toBeCloseTo(Math.PI / 2);
 });
 
-test('パワーアップで弾丸の形・大きさ・個数が変わる（砲身の数 = 1回の発射数）', () => {
+test('銃口の数 = レベル÷100の商+1（Lv1〜1000の全レベル）', () => {
+  for (let l = 1; l <= MAX_LEVEL; l++) {
+    const d = gunDesign(l);
+    expect(d.barrels).toBe(Math.floor(l / 100) + 1);
+    expect(barrelCount(l)).toBe(Math.floor(l / 100) + 1);
+    expect(d.barrelAngles.length).toBe(d.barrels);
+    expect(d.bullet.count).toBe(d.barrels);
+  }
+  expect(barrelCount(1)).toBe(1);
+  expect(barrelCount(99)).toBe(1);
+  expect(barrelCount(100)).toBe(2);
+  expect(barrelCount(550)).toBe(6);
+  expect(barrelCount(1000)).toBe(11);
+});
+
+test('レベルが上がるほど放射状に広い範囲へ弾を飛ばす', () => {
+  let prev = -1;
+  for (let l = 1; l <= MAX_LEVEL; l++) {
+    const d = gunDesign(l);
+    const width = Math.max(...d.barrelAngles) - Math.min(...d.barrelAngles);
+    expect(width).toBeCloseTo(spreadAngle(l), 4);
+    expect(width).toBeGreaterThanOrEqual(prev); // never narrower than a lower level
+    prev = width;
+    // fan is symmetric around the turret's forward axis and every muzzle points in a different direction
+    expect(d.barrelAngles[0]).toBeCloseTo(-d.barrelAngles.at(-1), 5);
+    expect(new Set(d.barrelAngles).size).toBe(d.barrels);
+  }
+  expect(spreadAngle(1)).toBe(0);
+  expect(spreadAngle(1000)).toBeGreaterThan(spreadAngle(500));
+  expect(spreadAngle(500)).toBeGreaterThan(spreadAngle(100));
+  expect(spreadAngle(1000)).toBeCloseTo(MAX_SPREAD, 4);
+});
+
+test('パワーアップで弾丸の形・大きさが変わる', () => {
   const reps = [1, 10, 50, 150, 350, 700, 1000];
   const designs = reps.map(gunDesign);
-  // shape differs for every rank
-  expect(new Set(designs.map((d) => d.bullet.shape)).size).toBe(7);
   expect(designs.map((d) => d.bullet.shape)).toEqual(BULLET_SHAPES);
-  // barrel count never decreases and bullet count equals barrel count
-  expect(designs.map((d) => d.barrels)).toEqual([1, 1, 2, 2, 3, 3, 4]);
-  for (const d of designs) expect(d.bullet.count).toBe(d.barrels);
-  // bullet size grows with level (inside a rank and across ranks)
   let prev = 0;
   for (let l = 1; l <= MAX_LEVEL; l++) {
     const sz = gunDesign(l).bullet.size;
@@ -114,37 +141,43 @@ test('パワーアップで弾丸の形・大きさ・個数が変わる（砲�
     prev = sz;
   }
   for (let i = 1; i < designs.length; i++) expect(designs[i].bullet.size).toBeGreaterThan(designs[i - 1].bullet.size);
+});
 
-  // each attack fires one bullet per barrel, from each barrel, at the same time
-  for (const level of reps) {
-    const b = new Battle([{ id: 1, level, cell: 2 }], [{ id: 1, level: 1000, cell: 2 }], { seed: 5 });
+test('攻撃1回で銃口の数だけ弾丸を同時に、各銃口の向きへ放射状に発射する', () => {
+  for (const level of [1, 99, 100, 199, 250, 480, 777, 1000]) {
+    const b = new Battle([{ id: 1, level, cell: 2 }], [{ id: 1, level: 1000, cell: 7 }], { seed: 5 });
     const g = b.guns[0];
+    const d = gunDesign(level);
     let guard = 0;
-    while (!b.events.some((e) => e.type === 'attack' && e.attacker === g.uid) && guard++ < 2000) b.step(1 / 60);
+    while (!b.events.some((e) => e.type === 'attack' && e.attacker === g.uid) && guard++ < 3000) b.step(1 / 60);
     const atk = b.events.find((e) => e.type === 'attack' && e.attacker === g.uid);
-    const n = barrelCount(level);
+    const n = Math.floor(level / 100) + 1;
     expect(atk.bulletCount).toBe(n);
-    expect(atk.projectiles.length).toBe(n);
     const ps = b.projectiles.filter((p) => p.owner === g.uid && p.volley === 1);
-    expect(ps.length).toBe(n);
-    expect(new Set(ps.map((p) => p.shape))).toEqual(new Set([gunDesign(level).bullet.shape]));
-    for (const p of ps) expect(p.size).toBe(gunDesign(level).bullet.size);
-    // volley damage = atk, split across bullets
-    expect(ps.reduce((a, p) => a + p.dmg, 0)).toBe(g.atk);
-    // bullets leave from different barrels (distinct lateral positions)
-    if (n > 1) {
-      const lat = ps.map((p) => p.x * Math.cos(g.yaw) - p.z * Math.sin(g.yaw)).sort((a, b) => a - b);
-      for (let i = 1; i < lat.length; i++) expect(lat[i] - lat[i - 1]).toBeGreaterThan(0.1);
-    }
+    expect(ps.length).toBe(n); // all at the same time (same step)
+    expect(new Set(ps.map((p) => p.shape))).toEqual(new Set([d.bullet.shape]));
+    // each bullet flies along its muzzle's direction: turret yaw + muzzle angle
+    const dirs = ps.map((p) => Math.atan2(p.vx, p.vz));
+    ps.forEach((p, i) => expect(wrapAngle(dirs[i] - (atk.yaw + d.barrelAngles[p.barrel]))).toBeCloseTo(0, 6));
+    // fan width of the volley == spread for that level
+    const rel = dirs.map((x) => wrapAngle(x - atk.yaw));
+    expect(Math.max(...rel) - Math.min(...rel)).toBeCloseTo(spreadAngle(level), 4);
+    // the aiming muzzle points straight at the target
+    const t = b.get(atk.target);
+    const aimDir = dirs[d.aimIndex];
+    expect(Math.abs(wrapAngle(aimDir - yawTo(g.x, g.z, t.x, t.z)))).toBeLessThanOrEqual(AIM_TOLERANCE + 1e-9);
+    for (const p of ps) expect(p.dmg).toBe(bulletDamage(g.atk, n));
   }
 });
 
-test('複数の弾丸がそれぞれ命中してダメージを与える', () => {
-  const b = new Battle([{ id: 1, level: 400, cell: 2 }], [{ id: 1, level: 1000, cell: 2 }], { seed: 2 });
+test('放射状の弾丸が複数の敵に同時に命中する', () => {
+  const enemies = [0, 1, 2, 3, 4].map((c) => ({ id: c + 1, level: 1000, cell: c })); // full enemy front row
+  const b = new Battle([{ id: 1, level: 900, cell: 2 }], enemies, { seed: 2 });
+  const atk = () => b.events.find((e) => e.type === 'attack' && e.attacker === 'player-1');
   let guard = 0;
-  while (b.events.filter((e) => e.type === 'hit').length < 3 && guard++ < 3000) b.step(1 / 60);
-  const hits = b.events.filter((e) => e.type === 'hit' && e.owner === 'player-1');
-  const atk = b.events.find((e) => e.type === 'attack' && e.attacker === 'player-1');
-  const fromFirstVolley = hits.filter((h) => atk.projectiles.includes(h.projectile));
-  expect(fromFirstVolley.length).toBe(3); // 3 barrels -> 3 hits
+  while (!atk() && guard++ < 3000) b.step(1 / 60);
+  for (let i = 0; i < 90; i++) b.step(1 / 60); // let the volley land
+  const vol = new Set(atk().projectiles);
+  const hits = b.events.filter((e) => e.type === 'hit' && vol.has(e.projectile));
+  expect(new Set(hits.map((h) => h.target)).size).toBeGreaterThanOrEqual(3);
 });

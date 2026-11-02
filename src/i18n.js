@@ -51,7 +51,7 @@ const STR = {
     sound: 'サウンド',
     on: 'ON',
     off: 'OFF',
-    stats: 'HP {hp} / 攻撃 {atk}',
+    stats: 'HP {hp} / 攻撃 {atk} / 砲口 {n}',
     rotate_hint: '画面を縦向きにしてください',
   },
   en: {
@@ -97,7 +97,7 @@ const STR = {
     sound: 'Sound',
     on: 'ON',
     off: 'OFF',
-    stats: 'HP {hp} / ATK {atk}',
+    stats: 'HP {hp} / ATK {atk} / Muzzles {n}',
     rotate_hint: 'Please rotate to portrait',
   },
   zh: {
@@ -143,7 +143,7 @@ const STR = {
     sound: '声音',
     on: '开',
     off: '关',
-    stats: 'HP {hp} / 攻击 {atk}',
+    stats: 'HP {hp} / 攻击 {atk} / 炮口 {n}',
     rotate_hint: '请竖屏游玩',
   },
   ko: {
@@ -189,7 +189,7 @@ const STR = {
     sound: '사운드',
     on: 'ON',
     off: 'OFF',
-    stats: 'HP {hp} / 공격 {atk}',
+    stats: 'HP {hp} / 공격 {atk} / 포구 {n}',
     rotate_hint: '세로 모드로 플레이해 주세요',
   },
   es: {
@@ -235,7 +235,7 @@ const STR = {
     sound: 'Sonido',
     on: 'SÍ',
     off: 'NO',
-    stats: 'PV {hp} / ATQ {atk}',
+    stats: 'PV {hp} / ATQ {atk} / Cañones {n}',
     rotate_hint: 'Gira el dispositivo a vertical',
   },
 };

@@ -209,17 +209,18 @@ test.describe('バトル', () => {
     expect(r.attacks.some((a) => a.team === 'enemy')).toBe(true);
   });
 
-  test('パワーアップに応じて弾丸の形・大きさ・個数が変わり、砲身の数だけ同時に発射される', async ({ page }) => {
-    // Lv1 (rank C, 1 barrel), Lv50 (rank A, 2 barrels), Lv350 (rank SS, 3 barrels)
+  test('パワーアップに応じて弾丸の形・大きさ・個数が変わり、銃口の数だけ同時に放射状に発射される', async ({ page }) => {
+    // muzzles = floor(level/100)+1 : Lv1 -> 1 (pellet), Lv150 -> 2 (crystal), Lv350 -> 4 (missile)
     await startDefaultBattle(page, {
-      guns: [{ id: 1, level: 1 }, { id: 2, level: 50 }, { id: 3, level: 350 }], nextId: 4,
-      layout: layout({ 1: 1, 2: 2, 3: 3 }), stage: 6,
+      // sturdy enemies (stage 20) so the battle lasts; the Lv1 gun sits in the back row so it survives long enough to fire
+      guns: [{ id: 1, level: 1 }, { id: 2, level: 150 }, { id: 3, level: 350 }], nextId: 4,
+      layout: layout({ 12: 1, 1: 2, 3: 3 }), stage: 20,
     }, 1);
-    const expected = { 'player-1': { n: 1, shape: 'pellet' }, 'player-2': { n: 2, shape: 'orb' }, 'player-3': { n: 3, shape: 'missile' } };
+    const expected = { 'player-1': { n: 1, shape: 'pellet' }, 'player-2': { n: 2, shape: 'crystal' }, 'player-3': { n: 4, shape: 'missile' } };
     // the 3D models have that many barrels
     const barrels = await page.evaluate(() => Object.fromEntries(['player-1', 'player-2', 'player-3'].map((k) => {
       const m = window.__game.scene.gunMeshes.get(k);
-      return [k, m.userData.barrels.children.filter((c) => c.geometry.parameters.depth > 0.3).length];
+      return [k, m.userData.barrels.children.length]; // one arm (barrel + tip + muzzle flash) per muzzle
     })));
     for (const [k, v] of Object.entries(expected)) expect(barrels[k]).toBe(v.n);
 
@@ -227,12 +228,12 @@ test.describe('バトル', () => {
     const seen = await page.evaluate(async (exp) => {
       const found = {};
       const t0 = performance.now();
-      while (Object.keys(found).length < 3 && performance.now() - t0 < 20000) {
+      while (Object.keys(found).length < 3 && performance.now() - t0 < 30000) {
         await new Promise((r) => requestAnimationFrame(r));
         const groups = {};
         for (const m of window.__game.scene.projMeshes.values()) {
           const key = `${m.userData.owner}#${m.userData.volley}`;
-          (groups[key] ||= []).push({ shape: m.userData.shape, size: m.userData.size });
+          (groups[key] ||= []).push({ shape: m.userData.shape, size: m.userData.size, dir: m.rotation.y });
         }
         for (const [key, list] of Object.entries(groups)) {
           const owner = key.split('#')[0];
@@ -246,6 +247,12 @@ test.describe('バトル', () => {
       expect(seen[k].length).toBe(v.n);
       for (const b of seen[k]) expect(b.shape).toBe(v.shape);
     }
+    // the bullets of one volley fly out in different (radial) directions, wider for the higher level
+    const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+    const fan = (list) => { const d = list.map((b) => wrap(b.dir - list[0].dir)); return Math.max(...d) - Math.min(...d); };
+    expect(fan(seen['player-1'])).toBe(0);
+    expect(fan(seen['player-2'])).toBeGreaterThan(0.1);
+    expect(fan(seen['player-3'])).toBeGreaterThan(fan(seen['player-2']));
     // bigger guns fire bigger bullets
     expect(seen['player-2'][0].size).toBeGreaterThan(seen['player-1'][0].size);
     expect(seen['player-3'][0].size).toBeGreaterThan(seen['player-2'][0].size);
